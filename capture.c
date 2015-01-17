@@ -1,0 +1,197 @@
+/*
+
+This example reads from the default PCM device
+and writes to standard output for 5 seconds of data.
+
+*/
+
+/* Use the newer ALSA API */
+#define ALSA_PCM_NEW_HW_PARAMS_API
+
+#include <alsa/asoundlib.h>
+
+int main(int argc, char * argv[]) {
+  long capture_loops;
+  int capture_rc;
+  int capture_size;
+  snd_pcm_t *capture_handle;
+  snd_pcm_hw_params_t *capture_params;
+  unsigned int capture_val;
+  int capture_dir;
+  snd_pcm_uframes_t capture_frames;
+  char *capture_buffer;
+
+
+
+
+  /* Open PCM device for recording (capture). */
+  capture_rc = snd_pcm_open(&capture_handle, argv[1],
+                    SND_PCM_STREAM_CAPTURE, 0);
+  if (capture_rc < 0) {
+    fprintf(stderr,
+            "unable to open record pcm device: %s\n",
+            snd_strerror(capture_rc));
+    exit(1);
+  }
+
+  /* Allocate a hardware parameters object. */
+  snd_pcm_hw_params_alloca(&capture_params);
+
+  /* Fill it in with default values. */
+  snd_pcm_hw_params_any(capture_handle, capture_params);
+
+  /* Set the desired hardware parameters. */
+
+  /* Interleaved mode */
+  snd_pcm_hw_params_set_access(capture_handle, capture_params,
+                      SND_PCM_ACCESS_RW_INTERLEAVED);
+
+  /* Signed 16-bit little-endian format */
+  snd_pcm_hw_params_set_format(capture_handle, capture_params,
+                              SND_PCM_FORMAT_S16_LE);
+
+  /* Two channels (stereo) */
+  snd_pcm_hw_params_set_channels(capture_handle, capture_params, 2);
+
+  /* 44100 bits/second sampling rate (CD quality) */
+  capture_val = 44100;
+  snd_pcm_hw_params_set_rate_near(capture_handle, capture_params,
+                                  &capture_val, &capture_dir);
+
+  /* Set period size to 32 frames. */
+  capture_frames = 32;
+  snd_pcm_hw_params_set_period_size_near(capture_handle,
+                              capture_params, &capture_frames, &capture_dir);
+
+  /* Write the parameters to the driver */
+  capture_rc = snd_pcm_hw_params(capture_handle, capture_params);
+  if (capture_rc < 0) {
+    fprintf(stderr,
+            "unable to set input hw parameters: %s\n",
+            snd_strerror(capture_rc));
+    exit(1);
+  }
+
+  /* Use a buffer large enough to hold one period */
+  snd_pcm_hw_params_get_period_size(capture_params,
+                                      &capture_frames, &capture_dir);
+  capture_size = capture_frames * 4; /* 2 bytes/sample, 2 channels */
+  capture_buffer = (char *) malloc(capture_size);
+
+  /* We want to loop for 5 seconds */
+  snd_pcm_hw_params_get_period_time(capture_params,
+                                         &capture_val, &capture_dir);
+  capture_loops = 5000000 / capture_val;
+
+
+  //Output init
+
+
+  int output_rc;
+  int output_size;
+  snd_pcm_t *output_handle;
+  snd_pcm_hw_params_t *output_params;
+  unsigned int output_val;
+  int output_dir;
+  snd_pcm_uframes_t output_frames;
+  char *output_buffer;
+
+  /* Open PCM device for playback. */
+  output_rc = snd_pcm_open(&output_handle, argv[2],
+                    SND_PCM_STREAM_PLAYBACK, 0);
+  if (output_rc < 0) {
+    fprintf(stderr,
+            "unable to open output pcm device: %s\n",
+            snd_strerror(output_rc));
+    exit(1);
+  }
+
+  /* Allocate a hardware parameters object. */
+  snd_pcm_hw_params_alloca(&output_params);
+
+  /* Fill it in with default values. */
+  snd_pcm_hw_params_any(output_handle, output_params);
+
+  /* Set the desired hardware parameters. */
+
+  /* Interleaved mode */
+  snd_pcm_hw_params_set_access(output_handle, output_params,
+                      SND_PCM_ACCESS_RW_INTERLEAVED);
+
+  /* Signed 16-bit little-endian format */
+  snd_pcm_hw_params_set_format(output_handle, output_params,
+                              SND_PCM_FORMAT_S16_LE);
+
+  /* Two channels (stereo) */
+  snd_pcm_hw_params_set_channels(output_handle, output_params, 2);
+
+  /* 44100 bits/second sampling rate (CD quality) */
+  output_val = 44100;
+  snd_pcm_hw_params_set_rate_near(output_handle, output_params,
+                                  &output_val, &output_dir);
+
+  /* Set period size to 32 frames. */
+  output_frames = 32;
+  snd_pcm_hw_params_set_period_size_near(output_handle,
+                              output_params, &output_frames, &output_dir);
+
+  /* Write the parameters to the driver */
+  output_rc = snd_pcm_hw_params(output_handle, output_params);
+  if (output_rc < 0) {
+    fprintf(stderr,
+            "unable to set output hw parameters: %s\n",
+            snd_strerror(output_rc));
+    exit(1);
+  }
+
+
+
+
+
+
+
+
+
+  while (1) {
+    capture_rc = snd_pcm_readi(capture_handle, capture_buffer, capture_frames);
+    if (capture_rc == -EPIPE) {
+      /* EPIPE means overrun */
+      fprintf(stderr, "overrun occurred\n");
+      snd_pcm_prepare(capture_handle);
+    } else if (capture_rc < 0) {
+      fprintf(stderr,
+              "error from read: %s\n",
+              snd_strerror(capture_rc));
+    } else if (capture_rc != (int)capture_frames) {
+      fprintf(stderr, "short read, read %d frames\n", capture_rc);
+    }
+
+    output_rc = snd_pcm_writei(output_handle, capture_buffer, capture_frames);
+
+    if (output_rc == -EPIPE) {
+      /* EPIPE means underrun */
+      fprintf(stderr, "underrun occurred\n");
+      snd_pcm_prepare(output_handle);
+    } else if (output_rc < 0) {
+      fprintf(stderr,
+              "error from writei: %s\n",
+              snd_strerror(output_rc));
+    }  else if (output_rc != (int)capture_frames) {
+      fprintf(stderr,
+              "short write, write %d frames\n", output_rc);
+    }
+
+
+  }
+
+  snd_pcm_drain(output_handle);
+  snd_pcm_close(output_handle);
+  free(output_buffer);
+
+
+  // snd_pcm_drain(capture_handle);
+  // snd_pcm_close(capture_handle);
+  // free(capture_buffer);
+
+  return 0;
+}

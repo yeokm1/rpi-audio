@@ -53,7 +53,7 @@ int main(int argc, char * argv[]) {
 
   /* Signed 16-bit little-endian format */
   snd_pcm_hw_params_set_format(capture_handle, capture_params,
-                              SND_PCM_FORMAT_FLOAT_BE );
+                              SND_PCM_FORMAT_S16_LE );
 
   /* Two channels (stereo) */
   snd_pcm_hw_params_set_channels(capture_handle, capture_params, 2);
@@ -124,7 +124,7 @@ int main(int argc, char * argv[]) {
 
   /* Signed 16-bit little-endian format */
   snd_pcm_hw_params_set_format(output_handle, output_params,
-                              SND_PCM_FORMAT_FLOAT_BE);
+                              SND_PCM_FORMAT_S16_LE);
 
   /* Two channels (stereo) */
   snd_pcm_hw_params_set_channels(output_handle, output_params, 2);
@@ -153,42 +153,24 @@ int main(int argc, char * argv[]) {
   
   int look_back_length = 3;
 
-  float prevRms = 0;
-  float targetRms = 0.7;
-  float currentRms = 0;
+  double prevRms = 0;
+  double targetRms = 0.7;
+  double currentRms = 0;
 
   //previous S_max
-  float prev_gain;
+  double prev_gain;
 
   int firstRun = 1;
 
   //amount of gain to add
-  float gain; 
-  float maxGain = 10;
+  double gain; 
+  double maxGain = 10;
   //max magnitude of frame
-  float S_max = 0;
+  double S_max = 0;
   //max magnitude of peak
-  float Peak = 0.95f;
+  double Peak = 0.95;
   //G[n]=Peak/abs(S_max[n])
   
-  /*
-  const uint32_t channels = 2;
-  const uint32_t sampleRate = 44100;
-  const uint32_t frameLenMsec = 100;
-  const uint32_t filterSize = 15; //default 31
-  const double peakValue = 0.95f; //0.95 default
-  const double maxAmplification = 10f;
-  //user input
-  const double targetRms = 0.8f; // range from 0 to 1
-
-  const bool channelsCoupled = true;
-  const bool enableDCCorrection = false;
-  const bool altBoundaryMode = false;
-  FILE *const logFile = NULL;
-
-  MDynamicAudioNormalizer_Handle* mdanHandle = createInstance(channels,sampleRate, frameLenMsec,filterSize,peakValue,maxAmplification, targetRms, compressFactor, channelsCoupled, enableDCCorrection, altBoundaryMode, logFile);
-  
-  */
 
 
   while (1) {
@@ -218,10 +200,10 @@ int main(int argc, char * argv[]) {
     double inputSamples[2][capture_size/2];
 
     //extract left and right channels into their buffers
-    //temp buffer for conversion to float
+    //temp buffer for conversion to double
     char temp[2];
     S_max = 0;
-    gain = 0.5f;
+    gain = 0.5;
     for(int i = 0; i < capture_frames; i++){
       /*
         leftChannel[i] = capture_buffer[(i*4)];
@@ -242,13 +224,14 @@ int main(int argc, char * argv[]) {
       temp[1] = capture_buffer[i*4+3];
       inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32768;
 
+/*
       cout << i << " frame: " << (int)capture_buffer[i*4] << " " << (int)capture_buffer[i*4+1] << " "  << (int)capture_buffer[i*4+2] << " " << (int)capture_buffer[i*4+3] << " " << 
       inputSamples[0][i] << " " << inputSamples[1][i] << " " ;
-
+*/
       inputSamples[0][i] *= gain;
       inputSamples[1][i] *= gain;
 
-      cout << inputSamples[0][i] << " " << inputSamples[1][i] << endl;
+  //    cout << inputSamples[0][i] << " " << inputSamples[1][i] << endl;
 
 
       //sanitization
@@ -283,24 +266,6 @@ int main(int argc, char * argv[]) {
     }
     
 
-/*
-        //apply the gain
-    for(int i = 0; i < capture_frames; i++){
-      //if(inputSamples[0][i] > 0.2)
-        inputSamples[0][i] *= gain;
-     // if(inputSamples[1][i] > 0.2)
-       // inputSamples[1][i] *= gain;
-     //sanitization
-      if(inputSamples[0][i] > 1){
-        inputSamples[0][i] = 1;
-      }
-      else if(inputSamples[0][i] < -1){
-        inputSamples[0][i] = -1;
-      }
-
-    }
-    */
-    
     
 
 

@@ -11,6 +11,9 @@ and writes to standard output for 5 seconds of data.
 #include <alsa/asoundlib.h>
 #include <stdlib.h>
 #include <math.h>
+#include <iostream>
+
+using namespace std;
 
 int main(int argc, char * argv[]) {
   long capture_loops;
@@ -50,7 +53,7 @@ int main(int argc, char * argv[]) {
 
   /* Signed 16-bit little-endian format */
   snd_pcm_hw_params_set_format(capture_handle, capture_params,
-                              SND_PCM_FORMAT_S16_LE);
+                              SND_PCM_FORMAT_FLOAT_BE );
 
   /* Two channels (stereo) */
   snd_pcm_hw_params_set_channels(capture_handle, capture_params, 2);
@@ -61,7 +64,7 @@ int main(int argc, char * argv[]) {
                                   &sample_rate, &capture_dir);
 
   /* Set period size to 32 frames. */
-  capture_frames = 2;
+  capture_frames = 4;
   snd_pcm_hw_params_set_period_size_near(capture_handle,
                               capture_params, &capture_frames, &capture_dir);
 
@@ -121,7 +124,7 @@ int main(int argc, char * argv[]) {
 
   /* Signed 16-bit little-endian format */
   snd_pcm_hw_params_set_format(output_handle, output_params,
-                              SND_PCM_FORMAT_S16_LE);
+                              SND_PCM_FORMAT_FLOAT_BE);
 
   /* Two channels (stereo) */
   snd_pcm_hw_params_set_channels(output_handle, output_params, 2);
@@ -132,7 +135,7 @@ int main(int argc, char * argv[]) {
                                   &output_val, &output_dir);
 
   /* Set period size to 32 frames. */
-  output_frames = 32;
+  output_frames = capture_frames;
   snd_pcm_hw_params_set_period_size_near(output_handle,
                               output_params, &output_frames, &output_dir);
 
@@ -218,6 +221,7 @@ int main(int argc, char * argv[]) {
     //temp buffer for conversion to float
     char temp[2];
     S_max = 0;
+    gain = 0.5f;
     for(int i = 0; i < capture_frames; i++){
       /*
         leftChannel[i] = capture_buffer[(i*4)];
@@ -225,13 +229,27 @@ int main(int argc, char * argv[]) {
         rightChannel[i] = capture_buffer[(i*4)+2];
         rightChannel[i] = capture_buffer[(i*4)+3];
       */
+
+
+
+
       temp[0] = capture_buffer[i*4];
       temp[1] = capture_buffer[i*4+1];
-      inputSamples[0][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32767;
+      inputSamples[0][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32768;
+
 
       temp[0] = capture_buffer[i*4+2];
       temp[1] = capture_buffer[i*4+3];
-      inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32767;
+      inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32768;
+
+      cout << i << " frame: " << (int)capture_buffer[i*4] << " " << (int)capture_buffer[i*4+1] << " "  << (int)capture_buffer[i*4+2] << " " << (int)capture_buffer[i*4+3] << " " << 
+      inputSamples[0][i] << " " << inputSamples[1][i] << " " ;
+
+      inputSamples[0][i] *= gain;
+      inputSamples[1][i] *= gain;
+
+      cout << inputSamples[0][i] << " " << inputSamples[1][i] << endl;
+
 
       //sanitization
       if(inputSamples[0][i] > 1){
@@ -265,6 +283,27 @@ int main(int argc, char * argv[]) {
     }
     
 
+/*
+        //apply the gain
+    for(int i = 0; i < capture_frames; i++){
+      //if(inputSamples[0][i] > 0.2)
+        inputSamples[0][i] *= gain;
+     // if(inputSamples[1][i] > 0.2)
+       // inputSamples[1][i] *= gain;
+     //sanitization
+      if(inputSamples[0][i] > 1){
+        inputSamples[0][i] = 1;
+      }
+      else if(inputSamples[0][i] < -1){
+        inputSamples[0][i] = -1;
+      }
+
+    }
+    */
+    
+    
+
+
     //printf("%f\n", gain);
 
     //smoothen the gain
@@ -283,7 +322,7 @@ int main(int argc, char * argv[]) {
 
     for(int i = 0; i < capture_frames; i++){
       //left
-      tempSum = (inputSamples[0][i]*32767) + 32767;
+      tempSum = (inputSamples[0][i]*32768) + 32767;
 
       char small = tempSum%256;
       char big = tempSum/256;
@@ -292,7 +331,7 @@ int main(int argc, char * argv[]) {
       output[i*4+1] = big;
 
       //right
-      tempSum = (inputSamples[1][i]*32767) + 32767;
+      tempSum = (inputSamples[1][i]*32768) + 32767;
 
       small = tempSum%256;
       big = tempSum/256;

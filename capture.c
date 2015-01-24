@@ -16,7 +16,7 @@ int main(int argc, char * argv[]) {
   int capture_size;
   snd_pcm_t *capture_handle;
   snd_pcm_hw_params_t *capture_params;
-  unsigned int capture_val;
+  unsigned int sample_rate;
   int capture_dir;
   snd_pcm_uframes_t capture_frames;
   char *capture_buffer;
@@ -54,12 +54,12 @@ int main(int argc, char * argv[]) {
   snd_pcm_hw_params_set_channels(capture_handle, capture_params, 2);
 
   /* 44100 bits/second sampling rate (CD quality) */
-  capture_val = 44100;
+  sample_rate = 44100;
   snd_pcm_hw_params_set_rate_near(capture_handle, capture_params,
-                                  &capture_val, &capture_dir);
+                                  &sample_rate, &capture_dir);
 
   /* Set period size to 32 frames. */
-  capture_frames = 32;
+  capture_frames = 2;
   snd_pcm_hw_params_set_period_size_near(capture_handle,
                               capture_params, &capture_frames, &capture_dir);
 
@@ -80,12 +80,11 @@ int main(int argc, char * argv[]) {
 
   /* We want to loop for 5 seconds */
   snd_pcm_hw_params_get_period_time(capture_params,
-                                         &capture_val, &capture_dir);
-  capture_loops = 5000000 / capture_val;
+                                         &sample_rate, &capture_dir);
+  capture_loops = 5000000 / sample_rate;
 
 
   //Output init
-
 
   int output_rc;
   int output_size;
@@ -145,11 +144,40 @@ int main(int argc, char * argv[]) {
   }
 
 
+  //DIY DNC stuffs
+  
+  int look_back_length = 1;
+  float left_history[look_back_length];
+  float right_history[look_back_length];
 
+  float prev_rms = 0.1;
 
+  //amount of gain to add
+  float gain = 0f;
+  //max magnitude of frame
+  float S_max = 1f;
+  //max magnitude of peak
+  float Peak = 1f;
+  //G[n]=Peak/abs(S_max[n])
+  
+  /*
+  const uint32_t channels = 2;
+  const uint32_t sampleRate = 44100;
+  const uint32_t frameLenMsec = 100;
+  const uint32_t filterSize = 15; //default 31
+  const double peakValue = 0.95f; //0.95 default
+  const double maxAmplification = 10f;
+  //user input
+  const double targetRms = 0.8f; // range from 0 to 1
 
+  const bool channelsCoupled = true;
+  const bool enableDCCorrection = false;
+  const bool altBoundaryMode = false;
+  FILE *const logFile = NULL;
 
-
+  MDynamicAudioNormalizer_Handle* mdanHandle = createInstance(channels,sampleRate, frameLenMsec,filterSize,peakValue,maxAmplification, targetRms, compressFactor, channelsCoupled, enableDCCorrection, altBoundaryMode, logFile);
+  
+  */
 
 
   while (1) {
@@ -166,8 +194,72 @@ int main(int argc, char * argv[]) {
       fprintf(stderr, "short read, read %d frames\n", capture_rc);
     }
 
-    output_rc = snd_pcm_writei(output_handle, capture_buffer, capture_frames);
+    //output_rc = snd_pcm_writei(output_handle, capture_buffer, capture_frames);
 
+    /*
+    char leftChannel[(capture_size/2)];
+    char rightChannel[(capture_size/2)];
+    double leftBuffer[(capture_size/2)];
+    double rightBuffer[(capture_size/2)];
+
+    double inputSamples[2][capture_size/2];
+    */
+
+
+    //extract left and right channels into their buffers
+    //temp buffer for conversion to float
+    char temp[2];
+    for(int i = 0; i < frames; i++){
+      /*
+        leftChannel[i] = capture_buffer[(i*4)];
+        leftChannel[i] = capture_buffer[(i*4)+1];
+        rightChannel[i] = capture_buffer[(i*4)+2];
+        rightChannel[i] = capture_buffer[(i*4)+3];
+      */
+      temp[0] = capture_buffer[i*4];
+      temp[1] = capture_buffer[i*4+1];
+      inputSamples[0][i] = (double)(temp[0] + temp[1]*256)/ 65536f;
+
+      temp[0] = capture_buffer[i*4+2];
+      temp[1] = capture_buffer[i*4+3];
+      inputSamples[1][i] = (double)(temp[0] + temp[1]*256)/ 65536f;
+    }
+
+    /*
+    
+    for(int i = 0; i < frames; i++){
+      temp[0] = leftChannel[i*2];
+      temp[1] = leftChannel[i*2+1];
+
+
+      inputSamples[0][i] = (double)(temp[0] + temp[1]*256)/ 65536f;
+
+
+      temp[0] = rightChannel[i*2];
+      temp[1] = rightChannel[i*2+1];
+      inputSamples[1][i] = (double)(temp[0] + temp[1]*256)/ 65536f;
+
+
+    }
+    */
+
+    int processing = 0;
+    int64_t inputSize = frames;
+    int64_t outputSize = 0;
+    do{
+      processing = processInplace(mdanHandle, inputSamples, inputSize, *outputSize);
+    }while(processing);
+
+    //outputSize is the number of samples in output buffer
+    double outputSamples[2][outputSize];
+
+    int flushing = 0;
+    do{
+      flushing = flushBuffer(mdanHandle, capture_buffer, const int64_t bufferSize, *outputSize);
+    }while(flushing);
+
+    output_rc = snd_pcm_writei(output_handle, capture_buffer, capture_frames);
+    
     if (output_rc == -EPIPE) {
       /* EPIPE means underrun */
       fprintf(stderr, "underrun occurred\n");

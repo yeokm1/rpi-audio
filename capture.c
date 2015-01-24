@@ -150,12 +150,12 @@ int main(int argc, char * argv[]) {
   
   int look_back_length = 3;
 
-  float prevRms = 0f;
+  float prevRms = 0;
   float targetRms = 0.7;
   float currentRms = 0;
 
   //previous S_max
-  float prev_gain[look_back_length];
+  float prev_gain;
 
   int firstRun = 1;
 
@@ -163,7 +163,7 @@ int main(int argc, char * argv[]) {
   float gain; 
   float maxGain = 10;
   //max magnitude of frame
-  float S_max = 0f;
+  float S_max = 0;
   //max magnitude of peak
   float Peak = 0.95f;
   //G[n]=Peak/abs(S_max[n])
@@ -212,12 +212,12 @@ int main(int argc, char * argv[]) {
 
     double inputSamples[2][capture_size/2];
     */
-
+    double inputSamples[2][capture_size/2];
 
     //extract left and right channels into their buffers
     //temp buffer for conversion to float
     char temp[2];
-    S_max = 0f;
+    S_max = 0;
     for(int i = 0; i < capture_frames; i++){
       /*
         leftChannel[i] = capture_buffer[(i*4)];
@@ -227,11 +227,11 @@ int main(int argc, char * argv[]) {
       */
       temp[0] = capture_buffer[i*4];
       temp[1] = capture_buffer[i*4+1];
-      inputSamples[0][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32767f;
+      inputSamples[0][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32767;
 
       temp[0] = capture_buffer[i*4+2];
       temp[1] = capture_buffer[i*4+3];
-      inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32767f;
+      inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32767;
 
       if(inputSamples[0][i] > S_max){
           S_max = inputSamples[0][i];
@@ -249,6 +249,8 @@ int main(int argc, char * argv[]) {
 
     //smoothen the gain
 
+    /*
+
     //add the gain
     for(int i = 0; i < capture_frames; i++){
       inputSamples[0][i] += gain; 
@@ -261,6 +263,8 @@ int main(int argc, char * argv[]) {
         inputSamples[1][i] = -1;
       }
     }
+
+    */
 
     prev_gain = gain;
 
@@ -285,8 +289,8 @@ int main(int argc, char * argv[]) {
 
       //right
       tempSum = (inputSamples[1][i]*32767) + 32767;
-      char small = tempSum%256;
-      char big = tempSum/256;
+      small = tempSum%256;
+      big = tempSum/256;
       
       output[i*4+2] = small;
       output[i*4+3] = big;

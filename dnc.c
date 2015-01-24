@@ -61,7 +61,7 @@ int main(int argc, char * argv[]) {
                                   &sample_rate, &capture_dir);
 
   /* Set period size to 32 frames. */
-  capture_frames = 2;
+  capture_frames = 32;
   snd_pcm_hw_params_set_period_size_near(capture_handle,
                               capture_params, &capture_frames, &capture_dir);
 
@@ -151,7 +151,7 @@ int main(int argc, char * argv[]) {
   int look_back_length = 3;
 
   float prevRms = 0;
-  float targetRms = 0.7;
+  float targetRms = 0.9;
   float currentRms = 0;
 
   //previous S_max
@@ -186,7 +186,7 @@ int main(int argc, char * argv[]) {
   
   */
   float prev_gain[3];
-    prev_gain[0] = 0;
+  prev_gain[0] = 0;
   prev_gain[1] = 0;
   prev_gain[2] = 0;
 
@@ -277,7 +277,7 @@ int main(int argc, char * argv[]) {
      //smoothen the gain
     float currentGain = gain;
 
-    gain = (9.0f/16.0f)*gain + (1.0f/16.0f)*prev_gain[0] + (1.0f/8.0f)*prev_gain[1] + (1.0f/4.0f)*prev_gain[2];
+    //gain = (9.0f/16.0f)*gain + (1.0f/16.0f)*prev_gain[0] + (1.0f/8.0f)*prev_gain[1] + (1.0f/4.0f)*prev_gain[2];
    
 
     //apply the gain
@@ -315,8 +315,9 @@ int main(int argc, char * argv[]) {
     }
 
     float currentRms = sqrt( sum/capture_size );
-
+    int rms = 0;
     //nerfing with rms
+    if(rms){
     float rmsDiff = targetRms - currentRms;
     if(rmsDiff > 0){
       for(int i = 0; i < capture_frames; i++){
@@ -365,7 +366,7 @@ int main(int argc, char * argv[]) {
 
       }
     }
-
+  }
 
 
     //limit the rms of the entire buffer

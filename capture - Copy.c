@@ -227,11 +227,11 @@ int main(int argc, char * argv[]) {
       */
       temp[0] = capture_buffer[i*4];
       temp[1] = capture_buffer[i*4+1];
-      inputSamples[0][i] = (double)(temp[0] + temp[1]*256 - 32767); // 32767;
+      inputSamples[0][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32767;
 
       temp[0] = capture_buffer[i*4+2];
       temp[1] = capture_buffer[i*4+3];
-      inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32767); // 32767;
+      inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32767;
 
       //sanitization
       if(inputSamples[0][i] > 1){

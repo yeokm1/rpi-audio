@@ -151,7 +151,7 @@ int main(int argc, char * argv[]) {
   int look_back_length = 3;
 
   float prevRms = 0;
-  float targetRms = 0.7;
+  float targetRms = 0.85;
   float currentRms = 0;
 
   //previous S_max
@@ -205,9 +205,12 @@ int main(int argc, char * argv[]) {
   signed short int tempSum = 0;
 
   char output[capture_size];
+  float sum = 0;
+
+  float rmsDiff = 0;
 
   while (1) {
-    
+
     capture_rc = snd_pcm_readi(capture_handle, capture_buffer, capture_frames);
     if (capture_rc == -EPIPE) {
       /* EPIPE means overrun */
@@ -242,13 +245,13 @@ int main(int argc, char * argv[]) {
       */
       temp[0] = capture_buffer[i*4];
       temp[1] = capture_buffer[i*4+1];
-      inputSamples[0][i] = (double)(temp[0] + temp[1]*256 - 32767) / 32767;
+      inputSamples[0][i] = (double)(temp[0] + temp[1]*256 - 32767) / 32768;
 
       temp[0] = capture_buffer[i*4+2];
       temp[1] = capture_buffer[i*4+3];
-      inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32767) / 32767;
+      inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32767) / 32768;
 
-      //sanitization        inputSamples[0][i] = -1;
+      //sanitization
 
       if(inputSamples[0][i] > 1){
         inputSamples[0][i] = 1;
@@ -327,9 +330,66 @@ int main(int argc, char * argv[]) {
 
     }
 
-
+    sum = 0;
     //limit the rms of the entire buffer
-    //currentRms = sqrt(    );
+    for(int i = 0; i < capture_frames; i++){
+      sum += inputSamples[0][i] * inputSamples[0][i];
+      sum += inputSamples[1][i] * inputSamples[1][i];
+    }
+
+    currentRms = sqrt( sum/capture_size );
+
+    //nerfing with rms
+    rmsDiff = targetRms - currentRms;
+    if(rmsDiff > 0){
+      for(int i = 0; i < capture_frames; i++){
+        inputSamples[0][i] *= (1.0 + rmsDiff);
+        inputSamples[1][i] *= (1.0 + rmsDiff);
+
+           //sanitization
+
+      if(inputSamples[0][i] > 1){
+        inputSamples[0][i] = 1;
+      }
+      else if(inputSamples[0][i] < -1){
+      }
+
+      //sanitization
+      if(inputSamples[1][i] > 1){
+        inputSamples[1][i] = 1;
+      }
+      else if(inputSamples[1][i] < -1){
+        inputSamples[1][i] = -1;
+      }
+
+      }
+
+    }
+    else if(rmsDiff < 0){
+      for(int i = 0; i < capture_frames; i++){
+        inputSamples[0][i] *= (1.0 + rmsDiff);
+        inputSamples[1][i] *= (1.0 + rmsDiff);
+
+           //sanitization
+
+      if(inputSamples[0][i] > 1){
+        inputSamples[0][i] = 1;
+      }
+      else if(inputSamples[0][i] < -1){
+      }
+
+      //sanitization
+      if(inputSamples[1][i] > 1){
+        inputSamples[1][i] = 1;
+      }
+      else if(inputSamples[1][i] < -1){
+        inputSamples[1][i] = -1;
+      }
+
+      }
+    }
+
+
 
     //convert from 1.0 to -1 back to 2byte units
     //little endian
@@ -337,7 +397,7 @@ int main(int argc, char * argv[]) {
 
     for(int i = 0; i < capture_frames; i++){
       //left
-      tempSum = (inputSamples[0][i]* 32767) + 32767;
+      tempSum = (inputSamples[0][i]* 32768) + 32767;
 
       small = tempSum%256;
       big = tempSum/256;
@@ -346,7 +406,7 @@ int main(int argc, char * argv[]) {
       output[i*4+1] = big;
 
       //right
-      tempSum = (inputSamples[1][i] * 32767) + 32767;
+      tempSum = (inputSamples[1][i] * 32768) + 32767;
 
       small = tempSum%256;
       big = tempSum/256;

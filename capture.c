@@ -233,6 +233,22 @@ int main(int argc, char * argv[]) {
       temp[1] = capture_buffer[i*4+3];
       inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32767;
 
+      //sanitization
+      if(inputSamples[0][i] > 1){
+        inputSamples[0][i] = 1;
+      }
+      else if(inputSamples[0][i] < -1){
+        inputSamples[0][i] = -1;
+      }
+
+      //sanitization
+      if(inputSamples[1][i] > 1){
+        inputSamples[1][i] = 1;
+      }
+      else if(inputSamples[1][i] < -1){
+        inputSamples[1][i] = -1;
+      }
+
       if(inputSamples[0][i] > S_max){
           S_max = inputSamples[0][i];
       }
@@ -243,28 +259,45 @@ int main(int argc, char * argv[]) {
     }
 
     gain = Peak / S_max;
+    
     if(gain > maxGain){
       gain = maxGain;
     }
+    
+
+    //printf("%f\n", gain);
 
     //smoothen the gain
 
-    /*
+    
 
     //add the gain
     for(int i = 0; i < capture_frames; i++){
-      inputSamples[0][i] += gain; 
-      inputSamples[1][i] -= gain;
-      //cap it
+      //double dsample=(double)sample * gain;
+      double dsample=(double)inputSamples[0][i] * gain; 
+      double dsample2=(double)inputSamples[1][i] * gain;
+
+      //sanitization
       if(inputSamples[0][i] > 1){
         inputSamples[0][i] = 1;
       }
-      if(inputSamples[1][i] < -1){
+      else if(inputSamples[0][i] < -1){
+        inputSamples[0][i] = -1;
+      }
+
+      //sanitization
+      if(inputSamples[1][i] > 1){
+        inputSamples[1][i] = 1;
+      }
+      else if(inputSamples[1][i] < -1){
         inputSamples[1][i] = -1;
       }
+
     }
 
-    */
+    
+
+
 
     prev_gain = gain;
 
@@ -281,6 +314,7 @@ int main(int argc, char * argv[]) {
     for(int i = 0; i < capture_frames; i++){
       //left
       tempSum = (inputSamples[0][i]*32767) + 32767;
+
       char small = tempSum%256;
       char big = tempSum/256;
       
@@ -289,6 +323,7 @@ int main(int argc, char * argv[]) {
 
       //right
       tempSum = (inputSamples[1][i]*32767) + 32767;
+
       small = tempSum%256;
       big = tempSum/256;
       

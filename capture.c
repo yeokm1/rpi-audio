@@ -9,6 +9,8 @@ and writes to standard output for 5 seconds of data.
 #define ALSA_PCM_NEW_HW_PARAMS_API
 
 #include <alsa/asoundlib.h>
+#include <stdlib.h>
+#include <math.h>
 
 int main(int argc, char * argv[]) {
   long capture_loops;
@@ -146,18 +148,24 @@ int main(int argc, char * argv[]) {
 
   //DIY DNC stuffs
   
-  int look_back_length = 1;
-  float left_history[look_back_length];
-  float right_history[look_back_length];
+  int look_back_length = 3;
 
-  float prev_rms = 0.1;
+  float prevRms = 0f;
+  float targetRms = 0.7;
+  float currentRms = 0;
+
+  //previous S_max
+  float prev_gain[look_back_length];
+
+  int firstRun = 1;
 
   //amount of gain to add
-  float gain = 0f;
+  float gain; 
+  float maxGain = 10;
   //max magnitude of frame
-  float S_max = 1f;
+  float S_max = 0f;
   //max magnitude of peak
-  float Peak = 1f;
+  float Peak = 0.95f;
   //G[n]=Peak/abs(S_max[n])
   
   /*
@@ -209,6 +217,7 @@ int main(int argc, char * argv[]) {
     //extract left and right channels into their buffers
     //temp buffer for conversion to float
     char temp[2];
+    S_max = 0f;
     for(int i = 0; i < frames; i++){
       /*
         leftChannel[i] = capture_buffer[(i*4)];
@@ -218,12 +227,45 @@ int main(int argc, char * argv[]) {
       */
       temp[0] = capture_buffer[i*4];
       temp[1] = capture_buffer[i*4+1];
-      inputSamples[0][i] = (double)(temp[0] + temp[1]*256)/ 65536f;
+      inputSamples[0][i] = (double)(temp[0] + temp[1]*256 - 32768)/ 32768f;
 
       temp[0] = capture_buffer[i*4+2];
       temp[1] = capture_buffer[i*4+3];
-      inputSamples[1][i] = (double)(temp[0] + temp[1]*256)/ 65536f;
+      inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32768)/ 32768f;
+
+      if(inputSamples[0][i] > S_max){
+          S_max = inputSamples[0][i];
+      }
+      if( abs(inputSamples[1][i]) > S_max){
+          S_max = abs(inputSamples[1][i]);
+      }
+
     }
+
+    gain = Peak / S_max;
+    if(gain > maxGain){
+      gain = maxGain;
+    }
+
+    //smoothen the gain
+
+    //add the gain
+    for(int i = 0; i < frames; i++){
+      inputSamples[0][i] += gain; 
+      inputSamples[1][i] -= gain;
+      //cap it
+      if(inputSamples[0][i] > 1){
+        inputSamples[0][i] = 1;
+      }
+      if(inputSamples[1][i] < -1){
+        inputSamples[1][i] = -1;
+      }
+    }
+
+    prev_gain = gain;
+
+    //limit the rms of the entire buffer
+    //currentRms = sqrt(    );
 
     /*
     
@@ -231,18 +273,13 @@ int main(int argc, char * argv[]) {
       temp[0] = leftChannel[i*2];
       temp[1] = leftChannel[i*2+1];
 
-
       inputSamples[0][i] = (double)(temp[0] + temp[1]*256)/ 65536f;
-
 
       temp[0] = rightChannel[i*2];
       temp[1] = rightChannel[i*2+1];
       inputSamples[1][i] = (double)(temp[0] + temp[1]*256)/ 65536f;
-
-
     }
-    */
-
+    
     int processing = 0;
     int64_t inputSize = frames;
     int64_t outputSize = 0;
@@ -257,6 +294,8 @@ int main(int argc, char * argv[]) {
     do{
       flushing = flushBuffer(mdanHandle, capture_buffer, const int64_t bufferSize, *outputSize);
     }while(flushing);
+
+    */
 
     output_rc = snd_pcm_writei(output_handle, capture_buffer, capture_frames);
     

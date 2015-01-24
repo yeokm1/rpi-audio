@@ -7,51 +7,71 @@
 
 #define BUFFERSIZE 10 
 int percent = 0;
-int fd;
+int USB;
 
 void *thread_function( void *ptr ){
+	
+
+	
 	
 	char buffer;
 	char writeBuffer[5];
 	int result;
 	while(1){
 		//sleep(1);
-		//fcntl(fd, F_SETFL, FNDELAY); 
-		read(fd, &buffer, sizeof(buffer));
-		if(buffer == 'u'){
-			percent++;
-		} else if(buffer == 'd'){
-			percent--;
-		}
+			int n = 0, spot = 0;
+			char buf;
+	
+			/* Whole response*/
+			char response;
+			memset(response, '\0', sizeof (response));
+		
+
+			n = read( USB, &buf, 1 );
+
+
+			if(buf == 'u'){
+				percent++;
+			} else if(buffer == 'd'){
+				percent--;
+			}
 		
 		sprintf(writeBuffer, "%d", percent);
-		write(fd, writeBuffer, 4);
+		write( USB, writeBuffer], 5 );
 	}
 }
 
 int main()
 {
-     int fd; /* port file descriptor */
-     char port[20] = “/dev/ttyS0″; /* port to connect to */
-     speed_t baud = B9600; /* baud rate */
+	open( "/dev/ttyUSB0", O_RDWR| O_NOCTTY );
+	struct termios tty;
+	struct termios tty_old;
+	memset (&tty, 0, sizeof (tty));
 
-     fd = open(port, O_RDWR); /* connect to port */
+/* Save old tty parameters */
+tty_old = tty;
 
-     /* set the other settings (in this case, 9600 8N1) */
-     struct termios settings;
-     tcgetattr(fd, &settings);
+/* Set Baud Rate */
+cfsetospeed (&tty, (speed_t)B9600);
+cfsetispeed (&tty, (speed_t)B9600);
 
-     cfsetospeed(&settings, baud); /* baud rate */
-     settings.c_cflag &= ~PARENB; /* no parity */
-     settings.c_cflag &= ~CSTOPB; /* 1 stop bit */
-     settings.c_cflag &= ~CSIZE;
-     settings.c_cflag |= CS8 | CLOCAL; /* 8 bits */
-     settings.c_lflag = ICANON; /* canonical mode */
-     settings.c_oflag &= ~OPOST; /* raw output */
+/* Setting other Port Stuff */
+tty.c_cflag     &=  ~PARENB;            // Make 8n1
+tty.c_cflag     &=  ~CSTOPB;
+tty.c_cflag     &=  ~CSIZE;
+tty.c_cflag     |=  CS8;
 
-     tcsetattr(fd, TCSANOW, &settings); /* apply the settings */
-     tcflush(fd, TCOFLUSH);
-     
+tty.c_cflag     &=  ~CRTSCTS;           // no flow control
+tty.c_cc[VMIN]   =  1;                  // read doesn't block
+tty.c_cc[VTIME]  =  5;                  // 0.5 seconds read timeout
+tty.c_cflag     |=  CREAD | CLOCAL;     // turn on READ & ignore ctrl lines
+
+/* Make raw */
+cfmakeraw(&tty);
+
+/* Flush Port, then applies attributes */
+tcflush( USB, TCIFLUSH );
+
      
      pthread_t thread;
 

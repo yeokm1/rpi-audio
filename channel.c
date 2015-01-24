@@ -213,23 +213,25 @@ int main(int argc, char * argv[]) {
       */
 
 
-
+	signed short tempVal;
 
       temp[0] = capture_buffer[i*4];
       temp[1] = capture_buffer[i*4+1];
-      inputSamples[0][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32768;
+      tempVal = (*(signed short*) temp);
+      inputSamples[0][i] = (double) tempVal/ 32768;
 
 
       temp[0] = capture_buffer[i*4+2];
       temp[1] = capture_buffer[i*4+3];
-      inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32768;
+      tempVal = (*(signed short*) temp);
+      inputSamples[1][i] = (double) tempVal/ 32768;
 
 /*
       cout << i << " frame: " << (int)capture_buffer[i*4] << " " << (int)capture_buffer[i*4+1] << " "  << (int)capture_buffer[i*4+2] << " " << (int)capture_buffer[i*4+3] << " " << 
       inputSamples[0][i] << " " << inputSamples[1][i] << " " ;
 */
-      inputSamples[0][i] *= gain;
-      inputSamples[1][i] *= gain;
+      //inputSamples[0][i] *= gain;
+      //inputSamples[1][i] *= gain;
 
   //    cout << inputSamples[0][i] << " " << inputSamples[1][i] << endl;
 
@@ -281,28 +283,21 @@ int main(int argc, char * argv[]) {
 
     //convert from 1.0 to -1 back to 2byte units
     //little endian
-    unsigned short int tempSum = 0;
 
     char output[capture_size];
 
     for(int i = 0; i < capture_frames; i++){
       //left
-      tempSum = (inputSamples[0][i]*32768) + 32767;
-
-      char small = tempSum%256;
-      char big = tempSum/256;
+      *(signed short*)temp = inputSamples[0][i] * 32768;
       
-      output[i*4] = small;
-      output[i*4+1] = big;
+      output[i*4] = temp[0];
+      output[i*4+1] = temp[1];
 
       //right
-      tempSum = (inputSamples[1][i]*32768) + 32767;
-
-      small = tempSum%256;
-      big = tempSum/256;
+      *(signed short*)temp = inputSamples[1][i] * 32768;
       
-      output[i*4+2] = small;
-      output[i*4+3] = big;
+      output[i*4+2] = temp[0];
+      output[i*4+3] = temp[1];
 
     }
 

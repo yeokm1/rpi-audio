@@ -155,13 +155,14 @@ int main(int argc, char * argv[]) {
   float currentRms = 0;
 
   //previous S_max
-  float prev_gain;
+  float prev_gain[3];
+  int oldestHistory = 0;
 
   int firstRun = 1;
 
   //amount of gain to add
   float gain; 
-  float maxGain = 10;
+  float maxGain = 5;
   //max magnitude of frame
   float S_max = 0;
   //max magnitude of peak
@@ -187,8 +188,26 @@ int main(int argc, char * argv[]) {
   
   */
 
+  prev_gain[0] = 0;
+  prev_gain[1] = 0;
+  prev_gain[2] = 0;
+  double inputSamples[2][capture_size/2];
+
+  //extract left and right channels into their buffers
+  //temp buffer for conversion to float
+  char temp[2];
+
+  float currentGain = 0;
+
+   char small ='0';
+  char big = '0';
+
+  signed short int tempSum = 0;
+
+  char output[capture_size];
 
   while (1) {
+    
     capture_rc = snd_pcm_readi(capture_handle, capture_buffer, capture_frames);
     if (capture_rc == -EPIPE) {
       /* EPIPE means overrun */
@@ -212,11 +231,7 @@ int main(int argc, char * argv[]) {
 
     double inputSamples[2][capture_size/2];
     */
-    double inputSamples[2][capture_size/2];
 
-    //extract left and right channels into their buffers
-    //temp buffer for conversion to float
-    char temp[2];
     S_max = 0;
     for(int i = 0; i < capture_frames; i++){
       /*
@@ -227,18 +242,18 @@ int main(int argc, char * argv[]) {
       */
       temp[0] = capture_buffer[i*4];
       temp[1] = capture_buffer[i*4+1];
-      inputSamples[0][i] = (double)(temp[0] + temp[1]*256 - 32767); // 32767;
+      inputSamples[0][i] = (double)(temp[0] + temp[1]*256 - 32767) / 32767;
 
       temp[0] = capture_buffer[i*4+2];
       temp[1] = capture_buffer[i*4+3];
-      inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32767); // 32767;
+      inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32767) / 32767;
 
-      //sanitization
+      //sanitization        inputSamples[0][i] = -1;
+
       if(inputSamples[0][i] > 1){
         inputSamples[0][i] = 1;
       }
       else if(inputSamples[0][i] < -1){
-        inputSamples[0][i] = -1;
       }
 
       //sanitization
@@ -264,12 +279,53 @@ int main(int argc, char * argv[]) {
       gain = maxGain;
     }
     
-
     //printf("%f\n", gain);
+    /*reference
+    short* sampleBuffer;
+    ...
+    short sample=*sampleBuffer;
+    double dsample=(double)sample * gain;
+    if (dsample>32767.0) {dsample=32767.0;}
+    if (dsample<-32768.0) {dsample=-32768.0;}
+    *sampleBuffer=(short)dsample;
+    sampleBuffer++;
+
+    */
 
     //smoothen the gain
+    currentGain = gain;
 
-    prev_gain = gain;
+    if(gain > 0){
+      gain = (9.0f/16.0f)*gain + (1.0f/16.0f)*prev_gain[0] + (1.0f/8.0f)*prev_gain[1] + (1.0f/4.0f)*prev_gain[2];
+    }
+    else if(gain < 0){
+      gain = (9.0f/16.0f)*gain + (1.0f/16.0f)*prev_gain[0] + (1.0f/8.0f)*prev_gain[1] + (1.0f/4.0f)*prev_gain[2];
+    }
+
+    //apply the gain
+    for(int i = 0; i < capture_frames; i++){
+      inputSamples[0][i] *= gain;
+      inputSamples[1][i] *= gain;
+      for(int j = 0; j < 2; j++){
+        if(inputSamples[j][i] > 1){
+          inputSamples[j][i] = 1;
+        }
+        else if(inputSamples[j][i] < -1){
+          inputSamples[j][i] = -1;
+        }
+      }
+
+    }
+    
+    for(int i = 0; i < 3; i++){
+      if(i+1 < 3){
+        prev_gain[i] = prev_gain[i+1];
+      }
+      else{
+        prev_gain[i] = currentGain;
+      }
+
+    }
 
 
     //limit the rms of the entire buffer
@@ -277,22 +333,20 @@ int main(int argc, char * argv[]) {
 
     //convert from 1.0 to -1 back to 2byte units
     //little endian
-    unsigned short int tempSum = 0;
-
-    char output[capture_size];
+    tempSum = 0;
 
     for(int i = 0; i < capture_frames; i++){
       //left
-      tempSum = (inputSamples[0][i]*32767) + 32767;
+      tempSum = (inputSamples[0][i]* 32767) + 32767;
 
-      char small = tempSum%256;
-      char big = tempSum/256;
+      small = tempSum%256;
+      big = tempSum/256;
       
       output[i*4] = small;
       output[i*4+1] = big;
 
       //right
-      tempSum = (inputSamples[1][i]*32767) + 32767;
+      tempSum = (inputSamples[1][i] * 32767) + 32767;
 
       small = tempSum%256;
       big = tempSum/256;
@@ -322,12 +376,12 @@ int main(int argc, char * argv[]) {
 
   snd_pcm_drain(output_handle);
   snd_pcm_close(output_handle);
-  free(output_buffer);
+  //free(output_buffer);
 
 
-  // snd_pcm_drain(capture_handle);
-  // snd_pcm_close(capture_handle);
-  // free(capture_buffer);
+  snd_pcm_drain(capture_handle);
+  snd_pcm_close(capture_handle);
+  free(capture_buffer);
 
   return 0;
 }

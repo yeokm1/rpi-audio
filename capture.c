@@ -218,7 +218,7 @@ int main(int argc, char * argv[]) {
     //temp buffer for conversion to float
     char temp[2];
     S_max = 0f;
-    for(int i = 0; i < frames; i++){
+    for(int i = 0; i < capture_frames; i++){
       /*
         leftChannel[i] = capture_buffer[(i*4)];
         leftChannel[i] = capture_buffer[(i*4)+1];
@@ -227,11 +227,11 @@ int main(int argc, char * argv[]) {
       */
       temp[0] = capture_buffer[i*4];
       temp[1] = capture_buffer[i*4+1];
-      inputSamples[0][i] = (double)(temp[0] + temp[1]*256 - 32768)/ 32768f;
+      inputSamples[0][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32767f;
 
       temp[0] = capture_buffer[i*4+2];
       temp[1] = capture_buffer[i*4+3];
-      inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32768)/ 32768f;
+      inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32767f;
 
       if(inputSamples[0][i] > S_max){
           S_max = inputSamples[0][i];
@@ -250,7 +250,7 @@ int main(int argc, char * argv[]) {
     //smoothen the gain
 
     //add the gain
-    for(int i = 0; i < frames; i++){
+    for(int i = 0; i < capture_frames; i++){
       inputSamples[0][i] += gain; 
       inputSamples[1][i] -= gain;
       //cap it
@@ -264,24 +264,51 @@ int main(int argc, char * argv[]) {
 
     prev_gain = gain;
 
+
     //limit the rms of the entire buffer
     //currentRms = sqrt(    );
 
+    //convert from 1.0 to -1 back to 2byte units
+    //little endian
+    unsigned short int tempSum = 0;
+
+    char output[capture_size];
+
+    for(int i = 0; i < capture_frames; i++){
+      //left
+      tempSum = (inputSamples[0][i]*32767) + 32767;
+      char small = tempSum%256;
+      char big = tempSum/256;
+      
+      output[i*4] = small;
+      output[i*4+1] = big;
+
+      //right
+      tempSum = (inputSamples[1][i]*32767) + 32767;
+      char small = tempSum%256;
+      char big = tempSum/256;
+      
+      output[i*4+2] = small;
+      output[i*4+3] = big;
+
+    }
+
+
     /*
     
-    for(int i = 0; i < frames; i++){
+    for(int i = 0; i < capture_frames; i++){
       temp[0] = leftChannel[i*2];
       temp[1] = leftChannel[i*2+1];
 
-      inputSamples[0][i] = (double)(temp[0] + temp[1]*256)/ 65536f;
+      inputSamples[0][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32767f;
 
       temp[0] = rightChannel[i*2];
       temp[1] = rightChannel[i*2+1];
-      inputSamples[1][i] = (double)(temp[0] + temp[1]*256)/ 65536f;
+      inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32767)/ 32767f;
     }
     
     int processing = 0;
-    int64_t inputSize = frames;
+    int64_t inputSize = capture_frames;
     int64_t outputSize = 0;
     do{
       processing = processInplace(mdanHandle, inputSamples, inputSize, *outputSize);
@@ -297,7 +324,7 @@ int main(int argc, char * argv[]) {
 
     */
 
-    output_rc = snd_pcm_writei(output_handle, capture_buffer, capture_frames);
+    output_rc = snd_pcm_writei(output_handle, output, capture_frames);
     
     if (output_rc == -EPIPE) {
       /* EPIPE means underrun */

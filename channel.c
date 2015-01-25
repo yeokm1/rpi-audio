@@ -271,7 +271,7 @@ int main(int argc, char * argv[]) {
 		sum += inputSamples[1][i] * inputSamples[1][i];
     }
 
-    float currentRms = sqrt( sum/capture_size );
+    float currentRms = sqrt( sum/(capture_size /2));
     //cout<<currentRms<<endl;
     int rms = 1;
     //nerfing with rms

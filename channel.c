@@ -203,7 +203,7 @@ int main(int argc, char * argv[]) {
     //temp buffer for conversion to double
     char temp[2];
     S_max = 0;
-    gain = 0.5;
+    gain = 1.0;
     for(int i = 0; i < capture_frames; i++){
       /*
         leftChannel[i] = capture_buffer[(i*4)];
@@ -230,8 +230,10 @@ int main(int argc, char * argv[]) {
       cout << i << " frame: " << (int)capture_buffer[i*4] << " " << (int)capture_buffer[i*4+1] << " "  << (int)capture_buffer[i*4+2] << " " << (int)capture_buffer[i*4+3] << " " << 
       inputSamples[0][i] << " " << inputSamples[1][i] << " " ;
 */
-      //inputSamples[0][i] *= gain;
-      //inputSamples[1][i] *= gain;
+      
+      
+      
+      
 
   //    cout << inputSamples[0][i] << " " << inputSamples[1][i] << endl;
 
@@ -260,15 +262,35 @@ int main(int argc, char * argv[]) {
       }
 
     }
+    
+    
+    float sum = 0;
+    //limit the rms of the entire buffer
+    for(int i = 0; i < capture_frames; i++){
+		sum += inputSamples[0][i] * inputSamples[0][i];
+		sum += inputSamples[1][i] * inputSamples[1][i];
+    }
+
+    float currentRms = sqrt( sum/capture_size );
+    //cout<<currentRms<<endl;
+    int rms = 1;
+    //nerfing with rms
+    if(rms){
+		float rmsDiff = targetRms - currentRms;
+		if(rmsDiff > 0){
+			for(int i = 0; i < capture_frames; i++){
+				inputSamples[0][i] *= (1.0 + rmsDiff*rmsDiff);
+				inputSamples[1][i] *= (1.0 + rmsDiff*rmsDiff);
+			}
+		}
+	}
+	
 
     gain = Peak / S_max;
     
     if(gain > maxGain){
       gain = maxGain;
     }
-    
-
-    
 
 
     //printf("%f\n", gain);

@@ -2,11 +2,12 @@
 #include <thread>
 #include <string>
 #include "SimpleSerial.h"
+#include <cstdlib>
 
 using namespace std;
 using namespace boost;
 
-int percent = 50;
+int percent = 85;
 
 void threadSerial(string serialPortAddress){
 	 try {
@@ -27,9 +28,18 @@ void threadSerial(string serialPortAddress){
 			}
 
 			cout << percent << endl;
-		 serial.writeString("@");
+			 serial.writeString("@");
 			serial.writeString(std::to_string(percent));
-
+		//	string command = "amixer -c 0 set PCM ";
+		//	command  =  command + string(percent);
+		//	command = command + "%";
+			
+			char buffer [50];
+			
+sprintf(buffer, "amixer -c 0 set PCM %d%%", percent);
+			
+std::system(buffer);
+cout << buffer << endl;
 		}
 
 		     

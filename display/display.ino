@@ -23,7 +23,7 @@ void setup() {
   uView.begin();      // begin of MicroView
   uView.clear(PAGE);   // erase hardware memory inside the OLED controller
   uView.display();
-  uView.setFontType(1);
+  uView.setFontType(2);
 
 }
 
@@ -57,12 +57,12 @@ void loop(){
   
   if(!upButtonState && ((currentMillis - timeLastPressedUpButton) > DEBOUNCE_TIME)){
       timeLastPressedUpButton = currentMillis;
-      Serial.print("u");
+      Serial.print("u\n");
   }
   
    if(!downButtonState && ((currentMillis - timeLastPressedDownButton) > DEBOUNCE_TIME)){
       timeLastPressedDownButton = currentMillis;
-      Serial.print("d");
+      Serial.print("d\n");
   }
   
   

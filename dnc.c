@@ -61,7 +61,7 @@ int main(int argc, char * argv[]) {
                                   &sample_rate, &capture_dir);
 
   /* Set period size to 32 frames. */
-  capture_frames = 32;
+  capture_frames = 8;
   snd_pcm_hw_params_set_period_size_near(capture_handle,
                               capture_params, &capture_frames, &capture_dir);
 
@@ -132,7 +132,7 @@ int main(int argc, char * argv[]) {
                                   &output_val, &output_dir);
 
   /* Set period size to 32 frames. */
-  output_frames = 32;
+  output_frames = capture_frames;
   snd_pcm_hw_params_set_period_size_near(output_handle,
                               output_params, &output_frames, &output_dir);
 

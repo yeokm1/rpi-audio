@@ -2,12 +2,11 @@
 #include <thread>
 #include <string>
 #include "SimpleSerial.h"
-#include <cstdlib>
 
 using namespace std;
 using namespace boost;
 
-int percent = 85;
+int percent = 50;
 
 void threadSerial(string serialPortAddress){
 	 try {
@@ -35,12 +34,9 @@ void threadSerial(string serialPortAddress){
 		//	command = command + "%";
 			
 			char buffer [50];
-char audio2buff[100];			
-sprintf(buffer, "amixer -c 0 set PCM %d%%", percent);
-sprintf(audio2buff, "amixer -c 1 cset iface=MIXER,name='HPOUT2 Digital Volume' %d%%", percent);			
-std::system(buffer);
-std::system(audio2buff);
-cout << buffer << endl;
+			sprintf(buffer, "amixer -c 0 set PCM %d", percent);
+			system(buffer);
+
 		}
 
 		     
@@ -58,9 +54,7 @@ int main(int argc, char* argv[])
 {
     thread t1(threadSerial, argv[1]);
 
-    while(true){
-        sleep(1);
-    }
+    while(true);
 
     return 0;
 }

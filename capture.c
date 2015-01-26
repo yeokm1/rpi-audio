@@ -415,12 +415,14 @@ int main(int argc, char * argv[]) {
       temp[1] = capture_buffer[i*4+3];
       inputSamples[1][i] = (double)(temp[0] + temp[1]*256 - 32767) / 32768;
 
+      /*
       if(cumFrameNum < 16){
         previousVals[cumFrameNum] = inputSamples[0][i];
         cumFrameNum++;
          previousVals[cumFrameNum] = inputSamples[0][i];
          cumFrameNum++;
       }
+      */
 
       //sanitization
 
@@ -474,9 +476,9 @@ int main(int argc, char * argv[]) {
 
     //apply the gain
     for(int i = 0; i < capture_frames; i++){
-      if(inputSamples[0][i] > 0.5)
+      if(inputSamples[0][i] > 0.2)
         inputSamples[0][i] *= gain;
-      if(inputSamples[1][i] > 0.5)
+      if(inputSamples[1][i] > 0.2)
         inputSamples[1][i] *= gain;
       for(int j = 0; j < 2; j++){
         if(inputSamples[j][i] > 1){
@@ -580,8 +582,8 @@ int main(int argc, char * argv[]) {
       small = tempSum%256;
       big = tempSum/256;
       
-      output[i*4+2] = small;
-      output[i*4+3] = big;
+      output[i*4+2] = (char)small;
+      output[i*4+3] = (char)big;
 
     }
 

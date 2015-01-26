@@ -212,7 +212,7 @@ int main(int argc, char * argv[]) {
 
     double inputSamples[2][capture_size/2];
     */
-    signed short int inputSamples[2][capture_size/2];
+    short inputSamples[2][capture_size/2];
 
     //extract left and right channels into their buffers
     //temp buffer for conversion to float
@@ -227,11 +227,11 @@ int main(int argc, char * argv[]) {
       */
       temp[0] = capture_buffer[i*4];
       temp[1] = capture_buffer[i*4+1];
-      inputSamples[0][i] = (signed short int)(temp[0] + temp[1]*256 - 32767); // 32767;
+      inputSamples[0][i] = (short)(temp[0] + temp[1]*256 - 32767); // 32767;
 
       temp[0] = capture_buffer[i*4+2];
       temp[1] = capture_buffer[i*4+3];
-      inputSamples[1][i] = (signed short int)(temp[0] + temp[1]*256 - 32767); // 32767;
+      inputSamples[1][i] = (short)(temp[0] + temp[1]*256 - 32767); // 32767;
 
       //sanitization
       if(inputSamples[0][i] > 1){

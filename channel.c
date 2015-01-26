@@ -64,7 +64,7 @@ int main(int argc, char * argv[]) {
                                   &sample_rate, &capture_dir);
 
   /* Set period size to 32 frames. */
-  capture_frames = 4;
+  capture_frames = 256;
   snd_pcm_hw_params_set_period_size_near(capture_handle,
                               capture_params, &capture_frames, &capture_dir);
 
@@ -154,11 +154,10 @@ int main(int argc, char * argv[]) {
   int look_back_length = 3;
 
   double prevRms = 0;
-  double targetRms = 0.7;
+  double targetRms = 0.5;
   double currentRms = 0;
 
   //previous S_max
-  double prev_gain;
 
   int firstRun = 1;
 
@@ -166,10 +165,15 @@ int main(int argc, char * argv[]) {
   double gain; 
   double maxGain = 10;
   //max magnitude of frame
-  double S_max = 0;
+  double S_max = 1;
   //max magnitude of peak
-  double Peak = 0.95;
+  double Peak = 0.8;
   //G[n]=Peak/abs(S_max[n])
+
+   double prev_gain[3];
+  prev_gain[0] = 0;
+  prev_gain[1] = 0;
+  prev_gain[2] = 0;
   
 
 
@@ -202,7 +206,7 @@ int main(int argc, char * argv[]) {
     //extract left and right channels into their buffers
     //temp buffer for conversion to double
     char temp[2];
-    S_max = 0;
+    S_max = 0.0000000001;
     gain = 1.0;
     for(int i = 0; i < capture_frames; i++){
       /*
@@ -225,16 +229,13 @@ int main(int argc, char * argv[]) {
       temp[1] = capture_buffer[i*4+3];
       tempVal = (*(signed short*) temp);
       inputSamples[1][i] = (double) tempVal/ 32768;
+    
 
 /*
       cout << i << " frame: " << (int)capture_buffer[i*4] << " " << (int)capture_buffer[i*4+1] << " "  << (int)capture_buffer[i*4+2] << " " << (int)capture_buffer[i*4+3] << " " << 
-      inputSamples[0][i] << " " << inputSamples[1][i] << " " ;
+      inputSamples[0][i] << " " << inputSamples[1][i] << " "  << endl;
 */
       
-      
-      
-      
-
   //    cout << inputSamples[0][i] << " " << inputSamples[1][i] << endl;
 
 
@@ -254,50 +255,280 @@ int main(int argc, char * argv[]) {
         inputSamples[1][i] = -1;
       }
 
-      if(inputSamples[0][i] > S_max){
-          S_max = inputSamples[0][i];
+      if(abs(inputSamples[0][i]) > S_max){
+          S_max = abs(inputSamples[0][i]);
       }
       if( abs(inputSamples[1][i]) > S_max){
           S_max = abs(inputSamples[1][i]);
       }
 
     }
-    
+
+     //preliminary boosting
+    for(int i = 0; i < capture_frames; i++){
+
+      if(S_max < 0.5){
+
+          if(abs(inputSamples[0][i]) > 0.05){
+            if(inputSamples[0][i] > 0)
+            inputSamples[0][i] += 0.3;
+            else{
+              inputSamples[0][i] -= 0.3;
+            }
+          }
+          if(abs(inputSamples[1][i]) > 0.05){
+            if(inputSamples[1][i] > 0)
+            inputSamples[1][i] += 0.3;
+            else{
+              inputSamples[1][i] -= 0.3;
+            }
+          }
+      }
+      else{
+
+/*
+         if( abs(inputSamples[0][i]) < 0.6){
+          inputSamples[0][i] *= 1.2;
+        }
+        if( abs(inputSamples[1][i]) < 0.6){
+          inputSamples[1][i] *= 1.2;
+        }
+      */
+
+      if(S_max > 0.8){
+
+        if(abs(inputSamples[0][i] > 0.3)){
+            if(inputSamples[0][i] > 0)
+            inputSamples[0][i] -= 0.1;
+            else{
+              inputSamples[0][i] += 0.1;
+            }
+		}
+        else if(abs(inputSamples[0][i]) > 0.5){
+            if(inputSamples[0][1] > 0)
+              inputSamples[0][i] -= 0.125;
+            else{
+              inputSamples[0][i] += 0.125;
+            }
+          }
+          else if(inputSamples[0][i] > 0.8){
+            if(inputSamples[0][i] > 0)
+              inputSamples[0][i] -= 0.15;
+            else{
+              inputSamples[0][i] += 0.15;
+            }
+          }
+
+        if(abs(inputSamples[1][i]) > 0.3){
+            if(inputSamples[1][i] > 0)
+            inputSamples[1][i] -= 0.1;
+            else{
+              inputSamples[1][i] += 0.1;
+            }
+		}
+        else if(abs(inputSamples[1][i]) > 0.5){
+            if(inputSamples[1][1] > 0)
+              inputSamples[1][i] -= 0.125;
+            else{
+              inputSamples[1][i] += 0.125;
+            }
+          }
+          else if(inputSamples[1][i] > 0.8){
+            if(inputSamples[1][i] > 0)
+              inputSamples[1][i] -= 0.15;
+            else{
+              inputSamples[1][i] += 0.15;
+            }
+          }
+		  
+        }
+		
+	      //secondary boosting
+     if( abs(inputSamples[0][i]) > targetRms){
+        inputSamples[0][i] = 0.8 * inputSamples[0][i];
+      }
+      if( abs(inputSamples[1][i]) > targetRms){
+        inputSamples[1][i] = 0.8 * inputSamples[1][i];
+      }
+      
+		
+	//sanitization
+      if(inputSamples[0][i] > 1){
+        inputSamples[0][i] = 1;
+      }
+      else if(inputSamples[0][i] < -1){
+        inputSamples[0][i] = -1;
+      }
+
+      //sanitization
+      if(inputSamples[1][i] > 1){
+        inputSamples[1][i] = 1;
+      }
+      else if(inputSamples[1][i] < -1){
+        inputSamples[1][i] = -1;
+      }
+
+      }
+
+      }
+
+
+     // inputSamples[0][i] = (inputSamples[0][i] ) * Peak;
+      //inputSamples[1][i] = (inputSamples[1][i] ) * Peak;
+
+
+      /*
+      if( abs(inputSamples[0][i]) > 0.05 && abs(inputSamples[0][i]) < 0.6){
+        inputSamples[0][i] *= 1.5;
+      }
+      if( abs(inputSamples[1][i]) > 0.05 && abs(inputSamples[0][i]) < 0.6){
+        inputSamples[1][i] *= 1.5;
+      }
+
+      if(abs(inputSamples[0][i]) > 0.05 && abs(inputSamples[0][i]) < 0.2 ){
+         inputSamples[0][i] += 0.2;
+      }
+
+      if(abs(inputSamples[1][i]) > 0.05 && abs(inputSamples[1][i]) < 0.2 ){
+         inputSamples[1][i] += 0.2;
+      }
+      */
+
+/*
+
+    gain = Peak / S_max;
+
+
+
+    if(gain > 500){
+      gain = 0;
+      //printf("WHATTT???\n");
+    } 
+
+
+    else if (gain < 50){
+      gain = 50;
+    } else if (gain < 100){
+      gain = 100;
+    }
+  
+   //
+
+
+    double currentGain = gain;
+
+    //gain = (9.0/16.0)*gain + (1.0/16.0)*prev_gain[0] + (1.0/8.0)*prev_gain[1] + (1.0/4.0)*prev_gain[2];
+    gain = (23.0/32.0)*gain + (1.0/32.0)*prev_gain[0] + (3.0/32.0)*prev_gain[1] + (5.0/4320)*prev_gain[2];
+
+    for(int i = 0; i < 3; i++){
+      if(i+1 < 3){
+        prev_gain[i] = prev_gain[i+1];
+      }
+      else{
+        prev_gain[i] = currentGain;
+      }
+
+    }
+    */
+
+	
+      /*
+    //apply the gain
+    for(int i = 0; i < capture_frames; i++){
+
+      if(abs(inputSamples[0][i]) > 0.05 && abs(inputSamples[0][i]) < 0.4 )
+        inputSamples[0][i] *= gain * 2;
+      if(abs(inputSamples[1][i]) > 0.05 && abs(inputSamples[0][i]) < 0.4)
+        inputSamples[1][i] *= gain * 2;
+
+      if(abs(inputSamples[0][i]) > 0.4 && abs(inputSamples[0][i]) < 0.7)
+        inputSamples[0][i] *= gain * 1.2;
+      if(abs(inputSamples[1][i]) > 0.4 && abs(inputSamples[0][i]) < 0.7)
+        inputSamples[1][i] *= gain * 1.2;
+
+      if(abs(inputSamples[0][i]) > 0.7 && abs(inputSamples[0][i]) < 0.85)
+        inputSamples[0][i] *= gain * 0.8;
+      if(abs(inputSamples[1][i]) > 0.7 && abs(inputSamples[0][i]) < 0.85)
+        inputSamples[1][i] *= gain * 0.8;
+        */
+
+       //cout << i << " frame: " <<  inputSamples[0][i] << " " << inputSamples[1][i] << " "  << S_max << endl;
+
+
+      /*
+      if(abs(inputSamples[0][i]) > 0 && abs(inputSamples[0][i]) < 100)
+        inputSamples[0][i] = 0;
+      if(abs(inputSamples[1][i]) > 0 && abs(inputSamples[1][i]) < 100)
+        inputSamples[1][i] = 0;
+  
+
+       //sanitization
+      if(inputSamples[0][i] > 1){
+        inputSamples[0][i] = 1;
+      }
+      else if(inputSamples[0][i] < -1){
+        inputSamples[0][i] = -1;
+      }
+
+      //sanitization
+      if(inputSamples[1][i] > 1){
+        inputSamples[1][i] = 1;
+      }
+      else if(inputSamples[1][i] < -1){
+        inputSamples[1][i] = -1;
+      }
+
+    }
+  
+    */
+
     
     float sum = 0;
     //limit the rms of the entire buffer
     for(int i = 0; i < capture_frames; i++){
-		sum += inputSamples[0][i] * inputSamples[0][i];
-		sum += inputSamples[1][i] * inputSamples[1][i];
+		  sum += inputSamples[0][i] * inputSamples[0][i];
+	   	sum += inputSamples[1][i] * inputSamples[1][i];
     }
 
-    float currentRms = sqrt( sum/(capture_size /2));
+    float currentRms = sqrt( sum/(capture_size));
     //cout<<currentRms<<endl;
+
     int rms = 1;
     //nerfing with rms
     if(rms){
 		float rmsDiff = targetRms - currentRms;
-		if(rmsDiff > 0){
+		if(rmsDiff != 0){
 			for(int i = 0; i < capture_frames; i++){
-				inputSamples[0][i] *= (1.0 + rmsDiff*rmsDiff);
-				inputSamples[1][i] *= (1.0 + rmsDiff*rmsDiff);
+				inputSamples[0][i] *= (1.0 + rmsDiff) * (1.0 + rmsDiff);
+				inputSamples[1][i] *= (1.0 + rmsDiff) * (1.0 + rmsDiff);
+
+         //sanitization
+      if(inputSamples[0][i] > 1){
+        inputSamples[0][i] = 1;
+      }
+      else if(inputSamples[0][i] < -1){
+        inputSamples[0][i] = -1;
+      }
+
+      //sanitization
+      if(inputSamples[1][i] > 1){
+        inputSamples[1][i] = 1;
+      }
+      else if(inputSamples[1][i] < -1){
+        inputSamples[1][i] = -1;
+      }
+
+
 			}
 		}
-	}
-	
 
-    gain = Peak / S_max;
-    
-    if(gain > maxGain){
-      gain = maxGain;
-    }
+
+	}
 
 
     //printf("%f\n", gain);
 
     //smoothen the gain
-
-    prev_gain = gain;
 
 
     //limit the rms of the entire buffer
